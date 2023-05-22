@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "github-bulk-review"
+version = "0.1.0"
+description = "A tool for bulk reviwing github pull requests."
+authors = ["javad-amin <javad.amin@outlook.com>"]
+license = "MIT License"
+readme = "README.md"
+packages = [{include = "github_bulk_review"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+streamlit = "^1.22.0"
+pygithub = "^1.58.2"
+configparser = "^5.3.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
