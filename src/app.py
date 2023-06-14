@@ -17,8 +17,7 @@ class FetchPullRequestFilter:
 
 
 def main() -> None:
-    config = ConfigParser()
-    config.read(CONFIG_FILE)
+    config = setup_config()
 
     if "pull_requests" not in st.session_state:
         st.session_state.pull_requests = []
@@ -108,7 +107,7 @@ def pr_fetch_view(config: ConfigParser, token: str) -> None:
         st.session_state.pull_requests = []
 
 
-def input_fetch_pr_filter(config):
+def input_fetch_pr_filter(config: ConfigParser) -> FetchPullRequestFilter:
     fetch_pr_filter = FetchPullRequestFilter(
         org_name=st.sidebar.text_input(
             "Organization name:",
@@ -138,20 +137,20 @@ def input_fetch_pr_filter(config):
     return fetch_pr_filter
 
 
-def update_config_file(config, section, key, value):
+def update_config_file(config: ConfigParser, section: str, key: str, value: str):
     config.set(section, key, value)
     with open(CONFIG_FILE, "w") as config_file:
         config.write(config_file)
 
 
-def prompt_remove_token(config):
+def prompt_remove_token(config: ConfigParser):
     if st.button("Remove Github token"):
         update_config_file(config, "GitHub", "token", "")
         st.success("Token removed successfully!")
         return prompt_github_token(config)
 
 
-def prompt_github_token(config):
+def prompt_github_token(config: ConfigParser) -> None:
     new_token = st.text_input("Enter your GitHub token:", type="password")
 
     if st.button("Save Github Token"):
@@ -161,7 +160,7 @@ def prompt_github_token(config):
         return new_token
 
 
-def fetch_pull_requests(fetch_pr_filter, token):
+def fetch_pull_requests(fetch_pr_filter: FetchPullRequestFilter, token: str) -> None:
     g = Github(token)
 
     filter_params = f"is:pr is:open archived:false"
@@ -181,6 +180,14 @@ def fetch_pull_requests(fetch_pr_filter, token):
             pull_requests.append(pr)
 
     return pull_requests
+
+
+def setup_config() -> ConfigParser:
+    config = ConfigParser()
+    config.read(CONFIG_FILE)
+    if "GitHub" not in config.sections():
+        config.add_section("GitHub")
+    return config
 
 
 if __name__ == "__main__":
