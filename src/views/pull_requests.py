@@ -25,62 +25,69 @@ def pr_fetch_view(token: str) -> None:
             )
             selection_result[pr] = checked
         comment_text = st.text_input(
-            label="Approval comment:",
+            label="Comment:",
             value=GithubConfig().get("comment_text"),
         )
         GithubConfig().update("comment_text", comment_text)
 
-        comment_only = st.form_submit_button(
-            label="Add comment without approval",
-        )
-        approved = st.form_submit_button(
-            label="Approve Selected Pull Requests",
-        )
-        approve_and_merge = st.form_submit_button(
-            label="Approve and Merge Selected Pull Requests",
-        )
+        comment_only = st.form_submit_button(label="Comment without approval")
+        approved = st.form_submit_button(label="Approve Selected Pull Requests")
+        approve_and_merge = st.form_submit_button(label="Approve and Merge Selected Pull Requests")
 
     if comment_only:
-        if not st.session_state.pull_requests:
-            st.warning("Nothing to comment on, fetch pull requests!")
-        else:
-            number_of_prs_selected = 0
-            for pr, selected in selection_result.items():
-                if selected:
-                    pr.create_comment(comment_text)
-                    st.write(f"Comment added to {pr}")
-                    number_of_prs_selected += 1
-            if number_of_prs_selected:
-                st.success(f"Comment added to {number_of_prs_selected} selected pull requests.")
-            else:
-                st.warning("No pull requests selected.")
-            st.warning("Note: Fetch again to comment on more Pull Requests, the list above is cleared.")
-
-    if approved or approve_and_merge:
-        if not st.session_state.pull_requests:
-            st.warning("Nothing to approve, fetch pull requests!")
-        else:
-            number_of_prs_selected = 0
-            for pr, approved in selection_result.items():
-                if approved:
-                    approval_response = pr.create_review(body=comment_text, event="APPROVE")
-                    if approval_response.state != "APPROVED":
-                        st.warning(
-                            f"Something went wrong while approving the {pr}, response body: {approval_response.body}!"
-                        )
-                    st.write(pr, "was approved")
-                    number_of_prs_selected += 1
-                    if approve_and_merge:
-                        time.sleep(1)
-                        pr.merge()
-                        st.write(pr, "was merged")
-                    else:
-                        time.sleep(1)
-            if number_of_prs_selected:
-                st.success(f'Approved {number_of_prs_selected} selected pull requests with comment: "{comment_text}"')
-                st.warning("Note: Fetch again to approve more Pull Requests, the list above is cleared.")
-            else:
-                st.warning("No pull requests selected.")
+        _submit_comment(comment_text, selection_result)
+    elif approved:
+        _submit_approval(comment_text, selection_result)
+    elif approve_and_merge:
+        _submit_approval_and_merge(comment_text, selection_result)
 
         # Clear the pull request list after the approval.
         st.session_state.pull_requests = []
+        st.experimental_rerun()
+
+
+def _submit_comment(comment_text: str, selection_result: dict) -> None:
+    _process_pull_requests(comment_text=comment_text, selection_result=selection_result, action="comment", merge=False)
+
+
+def _submit_approval(comment_text: str, selection_result: dict) -> None:
+    _process_pull_requests(comment_text=comment_text, selection_result=selection_result, action="approve", merge=False)
+
+
+def _submit_approval_and_merge(comment_text: str, selection_result: dict) -> None:
+    _process_pull_requests(comment_text=comment_text, selection_result=selection_result, action="approve", merge=True)
+
+
+def _process_pull_requests(comment_text: str, selection_result: dict, action: str, merge: bool) -> None:
+    if not st.session_state.pull_requests:
+        st.warning("No pull request selected!")
+        return
+
+    number_of_prs_selected = 0
+    for pr, selected in selection_result.items():
+        if selected:
+            if action == "comment":
+                pr.create_comment(comment_text)
+                st.write(f"Comment added to {pr}")
+            elif action == "approve":
+                approval_response = pr.create_review(body=comment_text, event="APPROVE")
+                if approval_response.state != "APPROVED":
+                    st.warning(f"Something went wrong while approving {pr}: {approval_response.body}")
+                st.write(f"{pr} was approved")
+                number_of_prs_selected += 1
+
+                if merge:
+                    time.sleep(1)
+                    pr.merge()
+                    st.write("{pr} was merged")
+                else:
+                    time.sleep(1)
+
+    if number_of_prs_selected:
+        st.success(f'{number_of_prs_selected} selected pull requests was acted on with comment: "{comment_text}"')
+        st.session_state.pull_requests = []
+        time.sleep(1)
+        # TODO: Maybe instead of rerunning the whole app, we can refetch the pull requests?
+        st.experimental_rerun()
+    else:
+        st.warning("No pull requests selected.")
