@@ -7,13 +7,13 @@ DEFAULT_SECTION_NAME = "GitHub"
 class GithubConfig:
     config = ConfigParser()
 
-    def setup_config(self) -> None:
+    def setup_config(self: "GithubConfig") -> None:
         self.config.read(CONFIG_FILE_NAME)
         if DEFAULT_SECTION_NAME not in self.config.sections():
             self.config.add_section(DEFAULT_SECTION_NAME)
 
     def get(
-        self,
+        self: "GithubConfig",
         key: str,
         fallback: str = "",
         section: str = DEFAULT_SECTION_NAME,
@@ -21,7 +21,7 @@ class GithubConfig:
         return self.config.get(section, key, fallback=fallback)
 
     def update(
-        self,
+        self: "GithubConfig",
         key: str,
         value: str,
         section: str = DEFAULT_SECTION_NAME,
