@@ -35,27 +35,26 @@ def pr_fetch_view(token: str) -> None:
         approve_and_merge = st.form_submit_button(label="Approve and Merge Selected Pull Requests")
 
     if comment_only:
-        _submit_comment(comment_text, selection_result)
+        _process_pull_requests(
+            comment_text=comment_text,
+            selection_result=selection_result,
+            action="comment",
+            merge=False,
+        )
     elif approved:
-        _submit_approval(comment_text, selection_result)
+        _process_pull_requests(
+            comment_text=comment_text,
+            selection_result=selection_result,
+            action="approve",
+            merge=False,
+        )
     elif approve_and_merge:
-        _submit_approval_and_merge(comment_text, selection_result)
-
-        # Clear the pull request list after the approval.
-        st.session_state.pull_requests = []
-        st.experimental_rerun()
-
-
-def _submit_comment(comment_text: str, selection_result: dict) -> None:
-    _process_pull_requests(comment_text=comment_text, selection_result=selection_result, action="comment", merge=False)
-
-
-def _submit_approval(comment_text: str, selection_result: dict) -> None:
-    _process_pull_requests(comment_text=comment_text, selection_result=selection_result, action="approve", merge=False)
-
-
-def _submit_approval_and_merge(comment_text: str, selection_result: dict) -> None:
-    _process_pull_requests(comment_text=comment_text, selection_result=selection_result, action="approve", merge=True)
+        _process_pull_requests(
+            comment_text=comment_text,
+            selection_result=selection_result,
+            action="approve",
+            merge=True,
+        )
 
 
 def _process_pull_requests(comment_text: str, selection_result: dict, action: str, merge: bool) -> None:
