@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import streamlit as st
 from github import Github
+from github.PullRequest import PullRequest
 
 CONFIG_FILE = "config.ini"
 
@@ -14,6 +15,7 @@ class FetchPullRequestFilter:
     review_requested_user: str
     author: str
     title: str
+    reviewed_by: str
 
 
 def main() -> None:
@@ -58,12 +60,15 @@ def pr_fetch_view(config: ConfigParser, token: str) -> None:
                 value=select_all,
             )
             selection_result[pr] = checked
-        approval_comment = st.text_input(
+        comment_text = st.text_input(
             label="Approval comment:",
             value=config.get("GitHub", "approval_comment", fallback=""),
         )
-        update_config_file(config, "GitHub", "approval_comment", approval_comment)
+        update_config_file(config, "GitHub", "approval_comment", comment_text)
 
+        comment_only = st.form_submit_button(
+            label="Add comment without approval",
+        )
         approved = st.form_submit_button(
             label="Approve Selected Pull Requests",
         )
@@ -71,31 +76,51 @@ def pr_fetch_view(config: ConfigParser, token: str) -> None:
             label="Approve and Merge Selected Pull Requests",
         )
 
+    if comment_only:
+        if not st.session_state.pull_requests:
+            st.warning("Nothing to comment on, fetch pull requests!")
+        else:
+            number_of_prs_selected = 0
+            for pr, selected in selection_result.items():
+                if selected:
+                    pr.create_comment(comment_text)
+                    st.write(f"Comment added to {pr}")
+                    number_of_prs_selected += 1
+            if number_of_prs_selected:
+                st.success(
+                    f"Comment added to {number_of_prs_selected} selected pull requests."
+                )
+            else:
+                st.warning(f"No pull requests selected.")
+            st.warning(
+                "Note: Fetch again to comment on more Pull Requests, the list above is cleared."
+            )
+
     if approved or approve_and_merge:
         if not st.session_state.pull_requests:
             st.warning("Nothing to approve, fetch pull requests!")
         else:
-            number_of_prs_approved = 0
+            number_of_prs_selected = 0
             for pr, approved in selection_result.items():
                 if approved:
                     approval_response = pr.create_review(
-                        body=approval_comment, event="APPROVE"
+                        body=comment_text, event="APPROVE"
                     )
                     if approval_response.state != "APPROVED":
                         st.warning(
                             f"Something went wrong while approving the {pr}, response body: {approval_response.body}!"
                         )
                     st.write(pr, "was approved")
-                    number_of_prs_approved += 1
+                    number_of_prs_selected += 1
                     if approve_and_merge:
                         time.sleep(1)
                         pr.merge()
                         st.write(pr, "was merged")
                     else:
                         time.sleep(1)
-            if number_of_prs_approved:
+            if number_of_prs_selected:
                 st.success(
-                    f'Approved {number_of_prs_approved} selected pull requests with comment: "{approval_comment}"'
+                    f'Approved {number_of_prs_selected} selected pull requests with comment: "{comment_text}"'
                 )
                 st.warning(
                     "Note: Fetch again to approve more Pull Requests, the list above is cleared."
@@ -125,6 +150,10 @@ def input_fetch_pr_filter(config: ConfigParser) -> FetchPullRequestFilter:
             "Title (optional):",
             value=config.get("GitHub", "title", fallback=""),
         ),
+        reviewed_by=st.sidebar.text_input(
+            "Reviewed by (optional):",
+            value=config.get("GitHub", "reviewed_by", fallback=""),
+        ),
     )
 
     update_config_file(config, "GitHub", "org_name", fetch_pr_filter.org_name)
@@ -133,6 +162,7 @@ def input_fetch_pr_filter(config: ConfigParser) -> FetchPullRequestFilter:
     )
     update_config_file(config, "GitHub", "author", fetch_pr_filter.author)
     update_config_file(config, "GitHub", "title", fetch_pr_filter.title)
+    update_config_file(config, "GitHub", "reviewed_by", fetch_pr_filter.reviewed_by)
 
     return fetch_pr_filter
 
@@ -150,7 +180,7 @@ def prompt_remove_token(config: ConfigParser):
         return prompt_github_token(config)
 
 
-def prompt_github_token(config: ConfigParser) -> None:
+def prompt_github_token(config: ConfigParser) -> str | None:
     new_token = st.text_input("Enter your GitHub token:", type="password")
 
     if st.button("Save Github Token"):
@@ -158,14 +188,19 @@ def prompt_github_token(config: ConfigParser) -> None:
 
         st.success("Token saved successfully!")
         return new_token
+    return None
 
 
-def fetch_pull_requests(fetch_pr_filter: FetchPullRequestFilter, token: str) -> None:
+def fetch_pull_requests(
+    fetch_pr_filter: FetchPullRequestFilter, token: str
+) -> list[PullRequest]:
     g = Github(token)
 
     filter_params = f"is:pr is:open archived:false"
     if fetch_pr_filter.review_requested_user:
         filter_params += f" review-requested:{fetch_pr_filter.review_requested_user}"
+    if fetch_pr_filter.reviewed_by:
+        filter_params += f" reviewed-by:{fetch_pr_filter.reviewed_by}"
     if fetch_pr_filter.author:
         filter_params += f" author:{fetch_pr_filter.author}"
     if fetch_pr_filter.title:
