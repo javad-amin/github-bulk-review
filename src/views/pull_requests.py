@@ -1,6 +1,7 @@
 import time
 
 import streamlit as st
+from github.PullRequest import PullRequest
 
 from config import GithubConfig
 from pull_requests import fetch_pull_requests
@@ -18,12 +19,21 @@ def pr_fetch_view(token: str) -> None:
     select_all = st.checkbox("Select/Deselect All", value=False)
 
     with st.form("pr_selection"):
+        if st.session_state.pull_requests:
+            st.write(f"{len(st.session_state.pull_requests)} pull requests found!")
+        else:
+            st.write("Use the sidebar to fetch pull requests!")
         for pr in st.session_state.pull_requests:
+            repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
+            mergability = f"{'✅ Mergable' if _is_ready_to_merge(pr) else '❌ Not Mergable'}"
+            needs_rebase = f"{' | ❗️ Rebase required' if not pr.mergeable else ''}"
             checked = st.checkbox(
-                f"{pr.base.repo.full_name} | {pr.title} by {pr.user.login} | [{pr.number}]({pr.html_url}) ",
+                f"{repo_name_link} | {pr.title} by {pr.user.login} | {mergability}{needs_rebase}",
                 value=select_all,
             )
+
             selection_result[pr] = checked
+
         comment_text = st.text_input(
             label="Comment:",
             value=GithubConfig().get("comment_text"),
@@ -85,8 +95,21 @@ def _process_pull_requests(comment_text: str, selection_result: dict, action: st
     if number_of_prs_selected:
         st.success(f'{number_of_prs_selected} selected pull requests was acted on with comment: "{comment_text}"')
         st.session_state.pull_requests = []
-        time.sleep(1)
         # TODO: Maybe instead of rerunning the whole app, we can refetch the pull requests?
-        st.experimental_rerun()
+        # st.experimental_rerun()
     else:
         st.warning("No pull requests selected.")
+
+
+def _is_ready_to_merge(pr: PullRequest) -> bool:
+    head_commit = pr.head.sha
+
+    check_runs = pr.base.repo.get_commit(head_commit).get_check_runs()
+
+    github_action_status = True
+    for check_run in check_runs:
+        if check_run.app.name == "GitHub Actions" or check_run.app.name == "GitHub Code Scanning":
+            if check_run.conclusion not in ["success", "skipped", "neutral"]:
+                github_action_status = False
+
+    return pr.mergeable and github_action_status
