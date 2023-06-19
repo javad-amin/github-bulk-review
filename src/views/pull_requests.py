@@ -11,8 +11,16 @@ from views.sidebar.search import pull_request_search_inputs
 def pr_fetch_view(token: str) -> None:
     fetch_pr_filter = pull_request_search_inputs()
 
+    check_github_action = st.sidebar.checkbox("Github Action Status", value=False)
+    if check_github_action:
+        st.sidebar.warning("Note that this option is slow due to multiple API calls.")
+
     if st.sidebar.button("Fetch Pull Requests"):
-        st.session_state.pull_requests = fetch_pull_requests(fetch_pr_filter, token)
+        fetch_status = st.info("Fetching pull requests, please wait!")
+        pull_requests = fetch_pull_requests(fetch_pr_filter, token)
+        st.session_state.pull_requests = pull_requests
+
+        fetch_status.info("All pull requests fetched!")
 
     selection_result = {}
 
@@ -25,8 +33,11 @@ def pr_fetch_view(token: str) -> None:
             st.write("Use the sidebar to fetch pull requests!")
         for pr in st.session_state.pull_requests:
             repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
-            mergability = f"{'✅ Mergable' if _is_ready_to_merge(pr) else '❌ Not Mergable'}"
-            needs_rebase = f"{' | ❗️ Rebase required' if not pr.mergeable else ''}"
+            if check_github_action:
+                mergability = f"{'✅ Mergable' if _is_ready_to_merge(pr) else '❌ Not Mergable'}"
+            else:
+                mergability = ""
+            needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
             checked = st.checkbox(
                 f"{repo_name_link} | {pr.title} by {pr.user.login} | {mergability}{needs_rebase}",
                 value=select_all,
@@ -68,22 +79,23 @@ def pr_fetch_view(token: str) -> None:
 
 
 def _process_pull_requests(comment_text: str, selection_result: dict, action: str, merge: bool) -> None:
-    if not st.session_state.pull_requests:
+    pull_requests = st.session_state.pull_requests
+    if not pull_requests:
         st.warning("No pull request selected!")
         return
 
     number_of_prs_selected = 0
     for pr, selected in selection_result.items():
         if selected:
+            number_of_prs_selected += 1
             if action == "comment":
-                pr.create_comment(comment_text)
+                pr.create_issue_comment(comment_text)
                 st.write(f"Comment added to {pr}")
             elif action == "approve":
                 approval_response = pr.create_review(body=comment_text, event="APPROVE")
                 if approval_response.state != "APPROVED":
                     st.warning(f"Something went wrong while approving {pr}: {approval_response.body}")
                 st.write(f"{pr} was approved")
-                number_of_prs_selected += 1
 
                 if merge:
                     time.sleep(1)
@@ -104,6 +116,7 @@ def _process_pull_requests(comment_text: str, selection_result: dict, action: st
 def _is_ready_to_merge(pr: PullRequest) -> bool:
     head_commit = pr.head.sha
 
+    # Issue this increases the number of API calls, making the app even slower
     check_runs = pr.base.repo.get_commit(head_commit).get_check_runs()
 
     github_action_status = True
