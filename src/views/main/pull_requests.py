@@ -1,10 +1,13 @@
 import time
+from dataclasses import dataclass
+from enum import Enum
 
 import streamlit as st
 from github.PullRequest import PullRequest
 
 from config import GithubConfig
 from pull_requests import fetch_pull_requests
+from views.main.models import PullRequestAction, PullRequestReview
 from views.sidebar.search import pull_request_search_inputs
 
 
@@ -22,11 +25,17 @@ def pr_fetch_view(token: str) -> None:
 
         fetch_status.info("All pull requests fetched!")
 
-    selection_result = {}
+    pull_request_review = _pull_request_form(
+        check_github_action,
+    )
 
+    _process_pull_requests(pull_request_review)
+
+
+def _pull_request_form(check_github_action: bool) -> PullRequestReview:
+    selection_result = {}
     select_all = st.checkbox("Select/Deselect All", value=False)
 
-    # TODO: Refactor this form into a function
     with st.form("pr_selection"):
         if st.session_state.pull_requests:
             st.write(f"{len(st.session_state.pull_requests)} pull requests found!")
@@ -56,54 +65,36 @@ def pr_fetch_view(token: str) -> None:
         approved = st.form_submit_button(label="Approve Selected Pull Requests")
         approve_and_merge = st.form_submit_button(label="Approve and Merge Selected Pull Requests")
 
-    if comment_only:
-        _process_pull_requests(
-            comment_text=comment_text,
-            selection_result=selection_result,
-            action="comment",
-            merge=False,
-        )
-    elif approved:
-        _process_pull_requests(
-            comment_text=comment_text,
-            selection_result=selection_result,
-            action="approve",
-            merge=False,
-        )
-    elif approve_and_merge:
-        _process_pull_requests(
-            comment_text=comment_text,
-            selection_result=selection_result,
-            action="approve",
-            merge=True,
-        )
+    return PullRequestReview(
+        selection_result=selection_result,
+        comment=comment_text,
+        action=_get_action(comment_only, approved, approve_and_merge),
+    )
 
 
-def _process_pull_requests(comment_text: str, selection_result: dict, action: str, merge: bool) -> None:
+def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
     pull_requests = st.session_state.pull_requests
     if not pull_requests:
         st.warning("No pull request selected!")
         return
 
     number_of_prs_selected = 0
-    for pr, selected in selection_result.items():
+    for pr, selected in pull_request_review.selection_result.items():
         if selected:
             number_of_prs_selected += 1
-            if action == "comment":
-                pr.create_issue_comment(comment_text)
+            if pull_request_review.action == PullRequestAction.COMMENT:
+                pr.create_issue_comment(pull_request_review.comment)
                 st.write(f"Comment added to {pr}")
-            elif action == "approve":
-                approval_response = pr.create_review(body=comment_text, event="APPROVE")
+            elif pull_request_review.action in [PullRequestAction.APPROVE, PullRequestAction.APPROVE_AND_MERGE]:
+                approval_response = pr.create_review(body=pull_request_review.comment, event="APPROVE")
                 if approval_response.state != "APPROVED":
                     st.warning(f"Something went wrong while approving {pr}: {approval_response.body}")
                 st.write(f"{pr} was approved")
 
-                if merge:
-                    time.sleep(1)
+                time.sleep(1)
+                if pull_request_review.action == PullRequestAction.ApproveAndMerge:
                     pr.merge()
                     st.write("{pr} was merged")
-                else:
-                    time.sleep(1)
 
     if number_of_prs_selected:
         st.success(f'{number_of_prs_selected} selected pull requests was acted on with comment: "{comment_text}"')
@@ -127,3 +118,14 @@ def _is_ready_to_merge(pr: PullRequest) -> bool:
                 github_action_status = False
 
     return pr.mergeable and github_action_status
+
+
+def _get_action(comment_only: bool, approved: bool, approve_and_merge: bool) -> PullRequestAction:
+    if comment_only:
+        return PullRequestAction.COMMENT
+    elif approved:
+        return PullRequestAction.APPROVE
+    elif approve_and_merge:
+        return PullRequestAction.APPROVE_AND_MERGE
+    else:
+        return None
