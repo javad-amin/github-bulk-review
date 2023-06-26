@@ -35,7 +35,7 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
             st.write("Use the sidebar to fetch pull requests!")
         for pr in st.session_state.pull_requests:
             repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
-            if pull_request_query.check_github_actions:
+            if pull_request_query.check_github_actions and pull_request_query.fetch_prs:
                 mergability = f"{' | ✅ Mergable' if _is_ready_to_merge(pr) else ' | ❌ Not Mergable'}"
             else:
                 mergability = ""

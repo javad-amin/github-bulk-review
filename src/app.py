@@ -16,9 +16,7 @@ def main() -> None:
     if "pull_requests" not in st.session_state:
         st.session_state.pull_requests = []
 
-    token = github_token_form()
-
-    if token:
+    if token := github_token_form():
         pr_fetch_view(token)
 
 
