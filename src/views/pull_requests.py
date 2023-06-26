@@ -26,6 +26,7 @@ def pr_fetch_view(token: str) -> None:
 
     select_all = st.checkbox("Select/Deselect All", value=False)
 
+    # TODO: Refactor this form into a function
     with st.form("pr_selection"):
         if st.session_state.pull_requests:
             st.write(f"{len(st.session_state.pull_requests)} pull requests found!")
