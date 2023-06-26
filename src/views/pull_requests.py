@@ -34,12 +34,12 @@ def pr_fetch_view(token: str) -> None:
         for pr in st.session_state.pull_requests:
             repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
             if check_github_action:
-                mergability = f"{'✅ Mergable' if _is_ready_to_merge(pr) else '❌ Not Mergable'}"
+                mergability = f"{' | ✅ Mergable' if _is_ready_to_merge(pr) else ' | ❌ Not Mergable'}"
             else:
                 mergability = ""
             needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
             checked = st.checkbox(
-                f"{repo_name_link} | {pr.title} by {pr.user.login} | {mergability}{needs_rebase}",
+                f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}",
                 value=select_all,
             )
 
