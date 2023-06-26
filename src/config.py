@@ -1,6 +1,5 @@
-from typing import Self
-
 from configparser import ConfigParser
+from typing import Self
 
 CONFIG_FILE_NAME = "config.ini"
 DEFAULT_SECTION_NAME = "GitHub"

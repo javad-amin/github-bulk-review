@@ -1,6 +1,4 @@
 import time
-from dataclasses import dataclass
-from enum import Enum
 
 import streamlit as st
 from github.PullRequest import PullRequest
@@ -97,7 +95,9 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
                     st.write("{pr} was merged")
 
     if number_of_prs_selected:
-        st.success(f'{number_of_prs_selected} selected pull requests was acted on with comment: "{comment_text}"')
+        st.success(
+            f'{number_of_prs_selected} selected pull requests was acted on with comment: "{pull_request_review.comment}"'
+        )
         st.session_state.pull_requests = []
         # TODO: Maybe instead of rerunning the whole app, we can refetch the pull requests?
         # st.experimental_rerun()
@@ -113,11 +113,17 @@ def _is_ready_to_merge(pr: PullRequest) -> bool:
 
     github_action_status = True
     for check_run in check_runs:
-        if check_run.app.name == "GitHub Actions" or check_run.app.name == "GitHub Code Scanning":
-            if check_run.conclusion not in ["success", "skipped", "neutral"]:
-                github_action_status = False
+        if check_run.app.name in [
+            "GitHub Actions",
+            "GitHub Code Scanning",
+        ] and check_run.conclusion not in [
+            "success",
+            "skipped",
+            "neutral",
+        ]:
+            github_action_status = False
 
-    return pr.mergeable and github_action_status
+    return bool(pr.mergeable and github_action_status)
 
 
 def _get_action(comment_only: bool, approved: bool, approve_and_merge: bool) -> PullRequestAction:
