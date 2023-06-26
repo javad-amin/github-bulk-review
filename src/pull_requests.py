@@ -1,40 +1,23 @@
-from dataclasses import dataclass
-from typing import Self
-
 from github import Github
 from github.PullRequest import PullRequest
 
-from config import GithubConfig
+from models import PullRequestQuery
 
 
-@dataclass
-class SearchParameters:
-    org_name: str
-    review_requested_user: str
-    author: str
-    title: str
-    reviewed_by: str
-
-    def __post_init__(self: Self) -> None:
-        for field_name, field_value in self.__dict__.items():
-            if field_name != "self" and field_value is not None:
-                GithubConfig().update(field_name, str(field_value))
-
-
-def fetch_pull_requests(fetch_pr_filter: SearchParameters, token: str) -> list[PullRequest]:
+def fetch_pull_requests(pull_request_query: PullRequestQuery, token: str) -> list[PullRequest]:
     g = Github(token)
 
     filter_params = "is:pr is:open archived:false"
-    if fetch_pr_filter.org_name:
-        filter_params += f" org:{fetch_pr_filter.org_name}"
-    if fetch_pr_filter.review_requested_user:
-        filter_params += f" review-requested:{fetch_pr_filter.review_requested_user}"
-    if fetch_pr_filter.reviewed_by:
-        filter_params += f" reviewed-by:{fetch_pr_filter.reviewed_by}"
-    if fetch_pr_filter.author:
-        filter_params += f" author:{fetch_pr_filter.author}"
-    if fetch_pr_filter.title:
-        filter_params += f" in:title {fetch_pr_filter.title}"
+    if pull_request_query.org_name:
+        filter_params += f" org:{pull_request_query.org_name}"
+    if pull_request_query.review_requested_user:
+        filter_params += f" review-requested:{pull_request_query.review_requested_user}"
+    if pull_request_query.reviewed_by:
+        filter_params += f" reviewed-by:{pull_request_query.reviewed_by}"
+    if pull_request_query.author:
+        filter_params += f" author:{pull_request_query.author}"
+    if pull_request_query.title:
+        filter_params += f" in:title {pull_request_query.title}"
 
     issues = g.search_issues(query=filter_params)
 

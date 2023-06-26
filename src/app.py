@@ -1,8 +1,8 @@
 import streamlit as st
 
 from config import GithubConfig
-from views.main.pull_requests import pr_fetch_view
-from views.sidebar.token import github_token_view
+from views.pull_requests import pr_fetch_view
+from views.sidebar.token import github_token_form
 
 
 def main() -> None:
@@ -16,7 +16,7 @@ def main() -> None:
     if "pull_requests" not in st.session_state:
         st.session_state.pull_requests = []
 
-    token = github_token_view()
+    token = github_token_form()
 
     if token:
         pr_fetch_view(token)

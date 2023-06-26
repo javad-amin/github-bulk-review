@@ -1,11 +1,11 @@
 import streamlit as st
 
 from config import GithubConfig
-from pull_requests import SearchParameters
+from pull_requests import PullRequestQuery
 
 
-def pull_request_search_inputs() -> SearchParameters:
-    fetch_pr_filter = SearchParameters(
+def pull_request_query_form() -> PullRequestQuery:
+    pull_request_query = PullRequestQuery(
         org_name=st.sidebar.text_input(
             "Organization name (optional):",
             value=GithubConfig().get("org_name"),
@@ -30,13 +30,19 @@ def pull_request_search_inputs() -> SearchParameters:
 
     if not any(
         [
-            fetch_pr_filter.org_name,
-            fetch_pr_filter.review_requested_user,
-            fetch_pr_filter.author,
-            fetch_pr_filter.title,
-            fetch_pr_filter.reviewed_by,
+            pull_request_query.org_name,
+            pull_request_query.review_requested_user,
+            pull_request_query.author,
+            pull_request_query.title,
+            pull_request_query.reviewed_by,
         ]
     ):
         st.sidebar.warning("No filter is set, will fetch all open pull requests on Github! Good luck!")
 
-    return fetch_pr_filter
+    pull_request_query.check_github_actions = st.sidebar.checkbox("Github Action Status", value=False)
+    if pull_request_query.check_github_actions:
+        st.sidebar.warning("Note that this option is slow due to multiple API calls.")
+
+    pull_request_query.fetch_prs = st.sidebar.button("Fetch Pull Requests")
+
+    return pull_request_query

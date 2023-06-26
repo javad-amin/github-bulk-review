@@ -3,7 +3,7 @@ import streamlit as st
 from config import GithubConfig
 
 
-def github_token_view() -> str | None:
+def github_token_form() -> str | None:
     token = GithubConfig().get("token")
 
     st.sidebar.title("GitHub Bulk Review")

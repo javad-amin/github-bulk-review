@@ -4,34 +4,28 @@ import streamlit as st
 from github.PullRequest import PullRequest
 
 from config import GithubConfig
+from models import PullRequestAction, PullRequestQuery, PullRequestReview
 from pull_requests import fetch_pull_requests
-from views.main.models import PullRequestAction, PullRequestReview
-from views.sidebar.search import pull_request_search_inputs
+from views.sidebar.search import pull_request_query_form
 
 
 def pr_fetch_view(token: str) -> None:
-    fetch_pr_filter = pull_request_search_inputs()
+    pull_request_query = pull_request_query_form()
 
-    check_github_action = st.sidebar.checkbox("Github Action Status", value=False)
-    if check_github_action:
-        st.sidebar.warning("Note that this option is slow due to multiple API calls.")
-
-    if st.sidebar.button("Fetch Pull Requests"):
+    if pull_request_query.fetch_prs:
         fetch_status = st.info("Fetching pull requests, please wait!")
-        pull_requests = fetch_pull_requests(fetch_pr_filter, token)
+        pull_requests = fetch_pull_requests(pull_request_query, token)
         st.session_state.pull_requests = pull_requests
 
         fetch_status.info("All pull requests fetched!")
 
-    pull_request_review = _pull_request_form(
-        check_github_action,
-    )
+    pull_request_review = _pull_request_form(pull_request_query)
 
     _process_pull_requests(pull_request_review)
 
 
-def _pull_request_form(check_github_action: bool) -> PullRequestReview:
-    selection_result = {}
+def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestReview:
+    selection_result: dict[PullRequest, bool] = {}
     select_all = st.checkbox("Select/Deselect All", value=False)
 
     with st.form("pr_selection"):
@@ -41,7 +35,7 @@ def _pull_request_form(check_github_action: bool) -> PullRequestReview:
             st.write("Use the sidebar to fetch pull requests!")
         for pr in st.session_state.pull_requests:
             repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
-            if check_github_action:
+            if pull_request_query.check_github_actions:
                 mergability = f"{' | ✅ Mergable' if _is_ready_to_merge(pr) else ' | ❌ Not Mergable'}"
             else:
                 mergability = ""
