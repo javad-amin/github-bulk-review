@@ -87,7 +87,7 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
                 st.write(f"{pr} was approved")
 
                 time.sleep(1)
-                if pull_request_review.action == PullRequestAction.ApproveAndMerge:
+                if pull_request_review.action == PullRequestAction.APPROVE_AND_MERGE:
                     pr.merge()
                     st.write("{pr} was merged")
 
