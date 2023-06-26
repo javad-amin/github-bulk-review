@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Self
 
 from github import Github
 from github.PullRequest import PullRequest
@@ -14,7 +15,7 @@ class SearchParameters:
     title: str
     reviewed_by: str
 
-    def __post_init__(self: "SearchParameters") -> None:
+    def __post_init__(self: Self) -> None:
         for field_name, field_value in self.__dict__.items():
             if field_name != "self" and field_value is not None:
                 GithubConfig().update(field_name, str(field_value))
