@@ -72,9 +72,12 @@ def _pull_request_form(check_github_action: bool) -> PullRequestReview:
 
 def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
     pull_requests = st.session_state.pull_requests
+    if pull_request_review.action == PullRequestAction.NONE:
+        return None
+
     if not pull_requests:
         st.warning("No pull request selected!")
-        return
+        return None
 
     number_of_prs_selected = 0
     for pr, selected in pull_request_review.selection_result.items():
@@ -134,4 +137,4 @@ def _get_action(comment_only: bool, approved: bool, approve_and_merge: bool) -> 
     elif approve_and_merge:
         return PullRequestAction.APPROVE_AND_MERGE
     else:
-        return None
+        return PullRequestAction.NONE

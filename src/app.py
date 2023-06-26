@@ -1,7 +1,7 @@
 import streamlit as st
 
 from config import GithubConfig
-from views.pull_requests import pr_fetch_view
+from views.main.pull_requests import pr_fetch_view
 from views.sidebar.token import github_token_view
 
 
