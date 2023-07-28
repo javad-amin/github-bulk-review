@@ -57,7 +57,6 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
         approved = st.form_submit_button(label="Approve Selected Pull Requests")
         approve_and_merge = st.form_submit_button(label="Approve and Merge Selected Pull Requests")
 
-    print(f"{selection_result=}")
     return PullRequestReview(
         selection_result=selection_result,
         comment=comment_text,
