@@ -127,7 +127,13 @@ def _is_ready_to_merge(pr: PullRequest) -> bool:
 
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={PullRequest: lambda pr: (pr.number, pr.updated_at)})
 def _is_approved(pr):
-    return pr.get_reviews().totalCount > 0
+    approved_reviews = 0
+    for review in pr.get_reviews():
+        if review.state == "APPROVED":
+            approved_reviews += 1
+        elif review.state == "CHANGES_REQUESTED":
+            return False
+    return approved_reviews > 0
 
 
 def _get_action(comment_only: bool, approved: bool, approve_and_merge: bool) -> PullRequestAction:
