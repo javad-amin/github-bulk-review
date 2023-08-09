@@ -5,16 +5,16 @@ from github.PullRequest import PullRequest
 
 from config import GithubConfig
 from models import PullRequestAction, PullRequestQuery, PullRequestReview
-from pull_requests import fetch_pull_requests
+from pull_requests import fetch_pull_requests, fetch_updated_pull_requests
 from views.sidebar.search import pull_request_query_form
 
 
-def pr_fetch_view(token: str) -> None:
+def pr_fetch_view() -> None:
     pull_request_query = pull_request_query_form()
 
     if pull_request_query.fetch_prs:
         fetch_status = st.info("Fetching pull requests, please wait!")
-        pull_requests = fetch_pull_requests(pull_request_query, token)
+        pull_requests = fetch_pull_requests(pull_request_query)
         st.session_state.pull_requests = pull_requests
 
         fetch_status.info("All pull requests fetched!")
@@ -40,7 +40,10 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
             else:
                 mergability = ""
             needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
-            review_status = f"{' | ✅ Approved' if _is_approved(pr) else ' | ❌ Not Approved'}"
+            if pr in st.session_state.prs_to_refetch:
+                review_status = f"{' | ✅ Approved' if _is_approved_no_cache(pr) else ' | ❌ Not Approved'}"
+            else:
+                review_status = f"{' | ✅ Approved' if _is_approved_with_cache(pr) else ' | ❌ Not Approved'}"
             checked = st.checkbox(
                 f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}{review_status}",
                 value=select_all,
@@ -75,6 +78,8 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
         return None
 
     number_of_prs_selected = 0
+    st.session_state.prs_to_refetch = []
+
     for pr, selected in pull_request_review.selection_result.items():
         if selected:
             number_of_prs_selected += 1
@@ -92,13 +97,17 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
                     pr.merge()
                     st.write(f"{pr} was merged")
 
+            st.session_state.prs_to_refetch.append(pr)
+
     if number_of_prs_selected:
         st.success(
             f'{number_of_prs_selected} selected pull requests was acted on with comment: "{pull_request_review.comment}"'
         )
-        # st.session_state.pull_requests = []
-        # TODO: Maybe instead of rerunning the whole app, we can refetch the pull requests?
-        # st.experimental_rerun()
+        if st.session_state.prs_to_refetch:
+            updated_pull_requests = fetch_updated_pull_requests(pull_requests, st.session_state.prs_to_refetch)
+            st.session_state.pull_requests = updated_pull_requests
+            st.info("Pull requests were refetched.")
+            st.experimental_rerun()
     else:
         st.warning("No pull requests selected.")
 
@@ -126,8 +135,13 @@ def _is_ready_to_merge(pr: PullRequest) -> bool:
 
 
 @st.cache_data(ttl=300, show_spinner=False, hash_funcs={PullRequest: lambda pr: (pr.number, pr.updated_at)})
-def _is_approved(pr):
+def _is_approved_with_cache(pr: PullRequest) -> bool:
+    return _is_approved_no_cache(pr)
+
+
+def _is_approved_no_cache(pr: PullRequest) -> bool:
     approved_reviews = 0
+
     for review in pr.get_reviews():
         if review.state == "APPROVED":
             approved_reviews += 1

@@ -6,8 +6,8 @@ from models import PullRequestQuery
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_pull_requests(pull_request_query: PullRequestQuery, token: str) -> list[PullRequest]:
-    g = Github(token)
+def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullRequest]:
+    g = Github(st.session_state.token)
 
     filter_params = "is:pr is:open archived:false"
     if pull_request_query.org_name:
@@ -30,3 +30,20 @@ def fetch_pull_requests(pull_request_query: PullRequestQuery, token: str) -> lis
             pull_requests.append(pr)
 
     return pull_requests
+
+
+def fetch_updated_pull_requests(
+    current_pull_requests: list[PullRequest], modified_pull_requests: list[PullRequest]
+) -> list[PullRequest]:
+    g = Github(st.session_state.token)
+    updated_pull_requests = current_pull_requests.copy()
+
+    for i, pr in enumerate(updated_pull_requests):
+        for modified_pr in modified_pull_requests:
+            if pr.number == modified_pr.number:
+                repo = g.get_repo(full_name_or_id=pr.base.repo.full_name)
+                updated_pr = repo.get_pull(number=pr.number)
+                updated_pull_requests[i] = updated_pr
+                break
+
+    return current_pull_requests
