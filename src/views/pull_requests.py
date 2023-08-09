@@ -102,11 +102,12 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
         st.warning("No pull requests selected.")
 
 
-def _is_ready_to_merge(pr: PullRequest) -> bool:
-    head_commit = pr.head.sha
+@st.cache_data(ttl=300, show_spinner=False)
+def _is_ready_to_merge(_pr: PullRequest) -> bool:
+    head_commit = _pr.head.sha
 
     # Issue this increases the number of API calls, making the app even slower
-    check_runs = pr.base.repo.get_commit(head_commit).get_check_runs()
+    check_runs = _pr.base.repo.get_commit(head_commit).get_check_runs()
 
     github_action_status = True
     for check_run in check_runs:
@@ -120,7 +121,7 @@ def _is_ready_to_merge(pr: PullRequest) -> bool:
         ]:
             github_action_status = False
 
-    return bool(pr.mergeable and github_action_status)
+    return bool(_pr.mergeable and github_action_status)
 
 
 def _get_action(comment_only: bool, approved: bool, approve_and_merge: bool) -> PullRequestAction:

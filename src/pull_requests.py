@@ -1,9 +1,11 @@
+import streamlit as st
 from github import Github
 from github.PullRequest import PullRequest
 
 from models import PullRequestQuery
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_pull_requests(pull_request_query: PullRequestQuery, token: str) -> list[PullRequest]:
     g = Github(token)
 
