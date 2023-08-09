@@ -36,12 +36,13 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
         for pr in st.session_state.pull_requests:
             repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
             if pull_request_query.check_github_actions:
-                mergability = f"{' | ✅ Mergable' if _is_ready_to_merge(pr) else ' | ❌ Not Mergable'}"
+                mergability = f"{' | 🟢 Mergable' if _is_ready_to_merge(pr) else ' | 🔴 Not Mergable'}"
             else:
                 mergability = ""
             needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
+            review_status = f"{' | ✅ Approved' if _is_approved(pr) else ' | ❌ Not Approved'}"
             checked = st.checkbox(
-                f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}",
+                f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}{review_status}",
                 value=select_all,
             )
 
@@ -95,19 +96,19 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
         st.success(
             f'{number_of_prs_selected} selected pull requests was acted on with comment: "{pull_request_review.comment}"'
         )
-        st.session_state.pull_requests = []
+        # st.session_state.pull_requests = []
         # TODO: Maybe instead of rerunning the whole app, we can refetch the pull requests?
         # st.experimental_rerun()
     else:
         st.warning("No pull requests selected.")
 
 
-@st.cache_data(ttl=300, show_spinner=False)
-def _is_ready_to_merge(_pr: PullRequest) -> bool:
-    head_commit = _pr.head.sha
+@st.cache_data(ttl=300, show_spinner=False, hash_funcs={PullRequest: lambda pr: (pr.number, pr.updated_at)})
+def _is_ready_to_merge(pr: PullRequest) -> bool:
+    head_commit = pr.head.sha
 
     # Issue this increases the number of API calls, making the app even slower
-    check_runs = _pr.base.repo.get_commit(head_commit).get_check_runs()
+    check_runs = pr.base.repo.get_commit(head_commit).get_check_runs()
 
     github_action_status = True
     for check_run in check_runs:
@@ -121,7 +122,12 @@ def _is_ready_to_merge(_pr: PullRequest) -> bool:
         ]:
             github_action_status = False
 
-    return bool(_pr.mergeable and github_action_status)
+    return bool(pr.mergeable and github_action_status)
+
+
+@st.cache_data(ttl=300, show_spinner=False, hash_funcs={PullRequest: lambda pr: (pr.number, pr.updated_at)})
+def _is_approved(pr):
+    return pr.get_reviews().totalCount > 0
 
 
 def _get_action(comment_only: bool, approved: bool, approve_and_merge: bool) -> PullRequestAction:
