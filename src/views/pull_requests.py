@@ -1,5 +1,7 @@
-import time
+import asyncio
+import concurrent.futures
 
+import aiocache
 import streamlit as st
 from github.PullRequest import PullRequest
 
@@ -9,22 +11,22 @@ from pull_requests import fetch_pull_requests
 from views.sidebar.search import pull_request_query_form
 
 
-def pr_fetch_view(token: str) -> None:
+async def pr_fetch_view(token: str) -> None:
     pull_request_query = pull_request_query_form()
 
     if pull_request_query.fetch_prs:
         fetch_status = st.info("Fetching pull requests, please wait!")
-        pull_requests = fetch_pull_requests(pull_request_query, token)
+        pull_requests = await fetch_pull_requests(pull_request_query, token)
         st.session_state.pull_requests = pull_requests
 
         fetch_status.info("All pull requests fetched!")
 
-    pull_request_review = _pull_request_form(pull_request_query)
+    pull_request_review = await _pull_request_form(pull_request_query)
 
-    _process_pull_requests(pull_request_review)
+    await _process_pull_requests(pull_request_review)
 
 
-def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestReview:
+async def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestReview:
     selection_result: dict[PullRequest, bool] = {}
     select_all = st.checkbox("Select/Deselect All", value=False)
 
@@ -36,10 +38,11 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
         for pr in st.session_state.pull_requests:
             repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
             if pull_request_query.check_github_actions:
-                mergability = f"{' | ✅ Mergable' if _is_ready_to_merge(pr) else ' | ❌ Not Mergable'}"
+                mergability_check = await _is_ready_to_merge(pr)
+                mergability = f"{' | ✅ Mergable' if mergability_check else ' | ❌ Not Mergable'}"
             else:
                 mergability = ""
-            needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
+            needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
             checked = st.checkbox(
                 f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}",
                 value=select_all,
@@ -64,7 +67,7 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
     )
 
 
-def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
+async def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
     pull_requests = st.session_state.pull_requests
     if pull_request_review.action == PullRequestAction.NONE:
         return None
@@ -86,9 +89,9 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
                     st.warning(f"Something went wrong while approving {pr}: {approval_response.body}")
                 st.write(f"{pr} was approved")
 
-                time.sleep(1)
+                await asyncio.sleep(1)
                 if pull_request_review.action == PullRequestAction.APPROVE_AND_MERGE:
-                    pr.merge()
+                    await pr.merge()
                     st.write(f"{pr} was merged")
 
     if number_of_prs_selected:
@@ -102,11 +105,17 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
         st.warning("No pull requests selected.")
 
 
-def _is_ready_to_merge(pr: PullRequest) -> bool:
+@aiocache.cached(ttl=300)
+async def _is_ready_to_merge(pr: PullRequest) -> bool:
     head_commit = pr.head.sha
 
-    # Issue this increases the number of API calls, making the app even slower
-    check_runs = pr.base.repo.get_commit(head_commit).get_check_runs()
+    loop = asyncio.get_running_loop()
+
+    def fetch_sync():
+        return pr.base.repo.get_commit(head_commit).get_check_runs()
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        check_runs = await loop.run_in_executor(executor, fetch_sync)
 
     github_action_status = True
     for check_run in check_runs:

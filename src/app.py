@@ -1,3 +1,5 @@
+import asyncio
+
 import streamlit as st
 
 from config import GithubConfig
@@ -17,7 +19,7 @@ def main() -> None:
         st.session_state.pull_requests = []
 
     if token := github_token_form():
-        pr_fetch_view(token)
+        asyncio.run(pr_fetch_view(token))
 
 
 if __name__ == "__main__":
