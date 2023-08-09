@@ -27,6 +27,7 @@ class PullRequestAction(Enum):
     NONE = "none"
     COMMENT = "comment"
     APPROVE = "approve"
+    MERGE = "merge"
     APPROVE_AND_MERGE = "approve_and_merge"
 
 
