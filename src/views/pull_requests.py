@@ -42,6 +42,13 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
             needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
             if pr in st.session_state.prs_to_refetch:
                 review_status = f"{' | ✅ Approved' if _is_approved_no_cache(pr) else ' | ❌ Not Approved'}"
+                pr = pr.base.repo.get_pull(number=pr.number)
+                if pr.merged:
+                    review_status += f"{' | Ⓜ️ Merged'}"
+                    st.write(
+                        f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}{review_status}"
+                    )
+                    continue
             else:
                 review_status = f"{' | ✅ Approved' if _is_approved_with_cache(pr) else ' | ❌ Not Approved'}"
             checked = st.checkbox(
@@ -111,6 +118,7 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
             updated_pull_requests = fetch_updated_pull_requests(pull_requests, st.session_state.prs_to_refetch)
             st.session_state.pull_requests = updated_pull_requests
             st.info("Pull requests were refetched.")
+            time.sleep(1)
             st.experimental_rerun()
     else:
         st.warning("No pull requests selected.")
