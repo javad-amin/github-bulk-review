@@ -16,8 +16,13 @@ def main() -> None:
     if "pull_requests" not in st.session_state:
         st.session_state.pull_requests = []
 
+    if "prs_to_refetch" not in st.session_state:
+        st.session_state.prs_to_refetch = []
+
     if token := github_token_form():
-        pr_fetch_view(token)
+        if "token" not in st.session_state:
+            st.session_state.token = token
+        pr_fetch_view()
 
 
 if __name__ == "__main__":
