@@ -25,7 +25,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 120
-target_version = ["py310"]
+target_version = ["py311"]
 exclude = ".venv"
 
 [tool.isort]
@@ -40,3 +40,4 @@ exclude = [".venv",".git","__pycache__"]
 ignore_missing_imports = true
 files = ["**/*.py"]
 exclude = [".venv"]
+python_version = "3.11"
