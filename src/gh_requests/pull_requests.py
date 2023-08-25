@@ -1,4 +1,4 @@
-from concurrent.futures import Executor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from itertools import chain
 from typing import Iterable
@@ -43,16 +43,12 @@ def _fetch_prs_concurrently(
     issues: list[Issue],
     check_github_actions: bool,
 ) -> list[PullRequestWithDetails]:
-    prs_with_details = []
-
     with ThreadPoolExecutor(max_workers=4) as task_pool:
-        add_pr_details_partial = partial(_add_pr_details, check_github_actions=check_github_actions)
-        futures = [task_pool.submit(add_pr_details_partial, issue) for issue in issues]
-        for future in futures:
-            pr_with_details = future.result()
-            prs_with_details.append(pr_with_details)
+        return task_pool.map(partial(_fetch_pr, check_github_actions=check_github_actions), issues)
 
-    return prs_with_details
+
+def _fetch_pr(issue: Issue, check_github_actions: bool = False) -> PullRequestWithDetails:
+    return _add_pr_details(pr=issue.as_pull_request(), check_github_actions=check_github_actions)
 
 
 def _fetch_updated_prs_concurrently(
@@ -60,30 +56,15 @@ def _fetch_updated_prs_concurrently(
     prs: list[PullRequest],
     check_github_actions: bool = False,
 ) -> list[PullRequestWithDetails]:
-    prs_with_details = []
-
     with ThreadPoolExecutor(max_workers=4) as task_pool:
-        add_pr_details_partial = partial(
-            _add_pr_details, check_github_actions=check_github_actions, refetch=True, gh=gh
-        )
-        futures = [task_pool.submit(add_pr_details_partial, pr) for pr in prs]
-        for future in futures:
-            pr_with_details = future.result()
-            prs_with_details.append(pr_with_details)
-
-    return prs_with_details
+        return task_pool.map(partial(_fetch_updated_pr, gh=gh, check_github_actions=check_github_actions), prs)
 
 
-def _add_pr_details(
-    issue: Issue | PullRequest,
-    check_github_actions: bool,
-    refetch: bool = False,
-    gh: Github | None = None,
-) -> PullRequestWithDetails:
-    if refetch:
-        pr = _fetch_updated_pr(gh, issue)
-    else:
-        pr = issue.as_pull_request()
+def _fetch_updated_pr(gh: Github, pr: PullRequest, check_github_actions: bool = False) -> PullRequest:
+    return _add_pr_details(gh.get_repo(pr.base.repo.full_name).get_pull(pr.number), check_github_actions)
+
+
+def _add_pr_details(pr: PullRequest, check_github_actions: bool) -> PullRequestWithDetails:
     pr_with_details = PullRequestWithDetails(
         pr=pr,
         title=pr.title,
@@ -99,10 +80,6 @@ def _add_pr_details(
     if check_github_actions:
         pr_with_details.is_ready_to_merge = _is_ready_to_merge(pr)
     return pr_with_details
-
-
-def _fetch_updated_pr(gh: Github, pr: PullRequest) -> PullRequest:
-    return gh.get_repo(pr.base.repo.full_name).get_pull(pr.number)
 
 
 def _combine_prs_with_precedence(a: Iterable[PullRequest], b: Iterable[PullRequest]) -> Iterable[PullRequest]:
