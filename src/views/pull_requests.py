@@ -121,44 +121,6 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
         st.warning("No pull requests selected.")
 
 
-@st.cache_data(ttl=300, show_spinner=False, hash_funcs={PullRequest: lambda pr: (pr.number, pr.updated_at)})
-def _is_ready_to_merge(pr: PullRequest) -> bool:
-    head_commit = pr.head.sha
-
-    # Issue this increases the number of API calls, making the app even slower
-    check_runs = pr.base.repo.get_commit(head_commit).get_check_runs()
-
-    github_action_status = True
-    for check_run in check_runs:
-        if check_run.app.name in [
-            "GitHub Actions",
-            "GitHub Code Scanning",
-        ] and check_run.conclusion not in [
-            "success",
-            "skipped",
-            "neutral",
-        ]:
-            github_action_status = False
-
-    return bool(pr.mergeable and github_action_status)
-
-
-@st.cache_data(ttl=300, show_spinner=False, hash_funcs={PullRequest: lambda pr: (pr.number, pr.updated_at)})
-def _is_approved_with_cache(pr: PullRequest) -> bool:
-    return _is_approved_no_cache(pr)
-
-
-def _is_approved_no_cache(pr: PullRequest) -> bool:
-    approved_reviews = 0
-
-    for review in pr.get_reviews():
-        if review.state == "APPROVED":
-            approved_reviews += 1
-        elif review.state == "CHANGES_REQUESTED":
-            return False
-    return approved_reviews > 0
-
-
 def _get_action(comment_only: bool, approved: bool, merge: bool, approve_and_merge: bool) -> PullRequestAction:
     if comment_only:
         return PullRequestAction.COMMENT
