@@ -1,6 +1,6 @@
 import streamlit as st
 
-from config import GithubConfig
+from gh_requests.config import GithubConfig
 
 
 def github_token_form() -> str | None:

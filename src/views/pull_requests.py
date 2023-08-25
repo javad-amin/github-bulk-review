@@ -3,9 +3,9 @@ import time
 import streamlit as st
 from github.PullRequest import PullRequest
 
-from config import GithubConfig
-from models import PullRequestAction, PullRequestQuery, PullRequestReview
-from pull_requests import fetch_pull_requests, fetch_updated_pull_requests
+from gh_requests.config import GithubConfig
+from gh_requests.models import PullRequestAction, PullRequestQuery, PullRequestReview, PullRequestWithDetails
+from gh_requests.pull_requests import fetch_pull_requests, fetch_updated_pull_requests
 from views.sidebar.search import pull_request_query_form
 
 
@@ -15,16 +15,16 @@ def pr_fetch_view() -> None:
     if pull_request_query.fetch_prs:
         fetch_status = st.info("Fetching pull requests, please wait!")
         pull_requests = fetch_pull_requests(pull_request_query)
-        st.session_state.pull_requests = pull_requests
+        st.session_state.pull_requests: list[PullRequestWithDetails] = pull_requests
 
         fetch_status.info("All pull requests fetched!")
 
-    pull_request_review = _pull_request_form(pull_request_query)
+    pull_request_review = _pull_request_form()
 
     _process_pull_requests(pull_request_review)
 
 
-def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestReview:
+def _pull_request_form() -> PullRequestReview:
     selection_result: dict[PullRequest, bool] = {}
     select_all = st.checkbox("Select/Deselect All", value=False)
 
@@ -33,30 +33,27 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
             st.write(f"{len(st.session_state.pull_requests)} pull requests found!")
         else:
             st.write("Use the sidebar to fetch pull requests!")
-        for pr in st.session_state.pull_requests:
-            repo_name_link = f"[{pr.base.repo.full_name}/{pr.number}]({pr.html_url})"
-            if pull_request_query.check_github_actions:
-                mergability = f"{' | 🟢 Mergable' if _is_ready_to_merge(pr) else ' | 🔴 Not Mergable'}"
+        for pr_with_details in st.session_state.pull_requests:
+            pr_with_details: PullRequestWithDetails
+            repo_name_link = f"[{pr_with_details.name}/{pr_with_details.number}]({pr_with_details.html_url})"
+            if pr_with_details.github_action_checked:
+                mergability = f"{' | 🟢 Mergable' if pr_with_details.is_ready_to_merge else ' | 🔴 Not Mergable'}"
             else:
                 mergability = ""
-            needs_rebase = f"{' | ⚠️ Rebase required' if not pr.mergeable else ''}"
-            if pr in st.session_state.prs_to_refetch:
-                review_status = f"{' | ✅ Approved' if _is_approved_no_cache(pr) else ' | ❌ Not Approved'}"
-                pr = pr.base.repo.get_pull(number=pr.number)
-                if pr.merged:
-                    review_status += f"{' | Ⓜ️ Merged'}"
-                    st.write(
-                        f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}{review_status}"
-                    )
-                    continue
-            else:
-                review_status = f"{' | ✅ Approved' if _is_approved_with_cache(pr) else ' | ❌ Not Approved'}"
+            needs_rebase = f"{' | ⚠️ Rebase required' if not pr_with_details.needs_rebase else ''}"
+            review_status = f"{' | ✅ Approved' if pr_with_details.is_approved else ' | ❌ Not Approved'}"
+            if pr_with_details.is_merged:
+                review_status += f"{' | Ⓜ️ Merged'}"
+                st.write(
+                    f"{repo_name_link} | {pr_with_details.title} by {pr_with_details.user.login}{mergability}{needs_rebase}{review_status}"
+                )
+                continue
             checked = st.checkbox(
-                f"{repo_name_link} | {pr.title} by {pr.user.login}{mergability}{needs_rebase}{review_status}",
+                f"{repo_name_link} | {pr_with_details.title} by {pr_with_details.user}{mergability}{needs_rebase}{review_status}",
                 value=select_all,
             )
 
-            selection_result[pr] = checked
+            selection_result[pr_with_details.pr] = checked
 
         comment_text = st.text_input(
             label="Comment:",
@@ -76,6 +73,7 @@ def _pull_request_form(pull_request_query: PullRequestQuery) -> PullRequestRevie
     )
 
 
+# TODO: Move API calls to gh_requests/pull_requests.py
 def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
     pull_requests = st.session_state.pull_requests
     if pull_request_review.action == PullRequestAction.NONE:
