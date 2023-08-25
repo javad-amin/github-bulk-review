@@ -4,7 +4,7 @@ import streamlit as st
 from github.PullRequest import PullRequest
 
 from gh_requests.config import GithubConfig
-from gh_requests.models import PullRequestAction, PullRequestReview, PullRequestWithDetails
+from gh_requests.models import PullRequestAction, PullRequestReview
 from gh_requests.pull_requests import fetch_pull_requests, fetch_updated_pull_requests
 from views.sidebar.search import pull_request_query_form
 
@@ -15,7 +15,7 @@ def pr_fetch_view() -> None:
     if pull_request_query.fetch_prs:
         fetch_status = st.info("Fetching pull requests, please wait!")
         pull_requests = fetch_pull_requests(pull_request_query)
-        st.session_state.pull_requests: list[PullRequestWithDetails] = pull_requests
+        st.session_state.pull_requests = pull_requests
 
         fetch_status.info("All pull requests fetched!")
 
@@ -34,7 +34,6 @@ def _pull_request_form() -> PullRequestReview:
         else:
             st.write("Use the sidebar to fetch pull requests!")
         for pr_with_details in st.session_state.pull_requests:
-            pr_with_details: PullRequestWithDetails
             repo_name_link = f"[{pr_with_details.name}/{pr_with_details.number}]({pr_with_details.html_url})"
             if pr_with_details.github_action_checked:
                 mergability = f"{' | 🟢 Mergable' if pr_with_details.is_ready_to_merge else ' | 🔴 Not Mergable'}"

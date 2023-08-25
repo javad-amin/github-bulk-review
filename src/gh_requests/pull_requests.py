@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from itertools import chain
-from typing import Iterable
+from typing import Iterable, Iterator
 
 import streamlit as st
 from github import Github
@@ -27,7 +27,7 @@ def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullReques
     if pull_request_query.title:
         filter_params += f" in:title {pull_request_query.title}"
 
-    issues = gh.search_issues(query=filter_params)
+    issues = list(gh.search_issues(query=filter_params))
     return list(_fetch_prs_concurrently(issues, pull_request_query.check_github_actions))
 
 
@@ -42,7 +42,7 @@ def fetch_updated_pull_requests(
 def _fetch_prs_concurrently(
     issues: list[Issue],
     check_github_actions: bool,
-) -> list[PullRequestWithDetails]:
+) -> Iterator[PullRequestWithDetails]:
     with ThreadPoolExecutor(max_workers=4) as task_pool:
         return task_pool.map(partial(_fetch_pr, check_github_actions), issues)
 
@@ -55,7 +55,7 @@ def _fetch_updated_prs_concurrently(
     gh: Github,
     prs: list[PullRequest],
     check_github_actions: bool = False,
-) -> list[PullRequestWithDetails]:
+) -> Iterator[PullRequestWithDetails]:
     with ThreadPoolExecutor(max_workers=4) as task_pool:
         return task_pool.map(partial(_fetch_updated_pr, gh, check_github_actions), prs)
 
@@ -75,7 +75,7 @@ def _add_pr_details(pr: PullRequest, check_github_actions: bool) -> PullRequestW
         needs_rebase=not pr.mergeable,
         is_approved=_is_approved(pr),
         github_action_checked=check_github_actions,
-        check_github_actions=_is_ready_to_merge(pr) if check_github_actions else False,
+        is_ready_to_merge=_is_ready_to_merge(pr) if check_github_actions else False,
         is_merged=pr.merged,
     )
 
