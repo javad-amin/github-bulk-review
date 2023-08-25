@@ -44,11 +44,11 @@ def _fetch_prs_concurrently(
     check_github_actions: bool,
 ) -> list[PullRequestWithDetails]:
     with ThreadPoolExecutor(max_workers=4) as task_pool:
-        return task_pool.map(partial(_fetch_pr, check_github_actions=check_github_actions), issues)
+        return task_pool.map(partial(_fetch_pr, check_github_actions), issues)
 
 
-def _fetch_pr(issue: Issue, check_github_actions: bool = False) -> PullRequestWithDetails:
-    return _add_pr_details(pr=issue.as_pull_request(), check_github_actions=check_github_actions)
+def _fetch_pr(check_github_actions: bool, issue: Issue) -> PullRequestWithDetails:
+    return _add_pr_details(issue.as_pull_request(), check_github_actions)
 
 
 def _fetch_updated_prs_concurrently(
@@ -57,10 +57,10 @@ def _fetch_updated_prs_concurrently(
     check_github_actions: bool = False,
 ) -> list[PullRequestWithDetails]:
     with ThreadPoolExecutor(max_workers=4) as task_pool:
-        return task_pool.map(partial(_fetch_updated_pr, gh=gh, check_github_actions=check_github_actions), prs)
+        return task_pool.map(partial(_fetch_updated_pr, gh, check_github_actions), prs)
 
 
-def _fetch_updated_pr(gh: Github, pr: PullRequest, check_github_actions: bool = False) -> PullRequest:
+def _fetch_updated_pr(gh: Github, check_github_actions: bool, pr: PullRequest) -> PullRequest:
     return _add_pr_details(gh.get_repo(pr.base.repo.full_name).get_pull(pr.number), check_github_actions)
 
 
