@@ -4,7 +4,7 @@ import streamlit as st
 from github.PullRequest import PullRequest
 
 from gh_requests.config import GithubConfig
-from gh_requests.models import PullRequestAction, PullRequestQuery, PullRequestReview, PullRequestWithDetails
+from gh_requests.models import PullRequestAction, PullRequestReview, PullRequestWithDetails
 from gh_requests.pull_requests import fetch_pull_requests, fetch_updated_pull_requests
 from views.sidebar.search import pull_request_query_form
 
