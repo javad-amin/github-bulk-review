@@ -36,7 +36,7 @@ def fetch_updated_pull_requests(
 ) -> list[PullRequest]:
     gh = Github(st.session_state.token)
     updated_prs = _fetch_updated_prs_concurrently(gh, modified_pull_requests)
-    return list(_merge_pr_lists(current_pull_requests, updated_prs))
+    return list(_combine_prs_with_precedence(current_pull_requests, updated_prs))
 
 
 def _fetch_prs_concurrently(
@@ -105,7 +105,7 @@ def _fetch_updated_pr(gh: Github, pr: PullRequest) -> PullRequest:
     return gh.get_repo(pr.base.repo.full_name).get_pull(pr.number)
 
 
-def _merge_pr_lists(a: Iterable[PullRequest], b: Iterable[PullRequest]) -> Iterable[PullRequest]:
+def _combine_prs_with_precedence(a: Iterable[PullRequest], b: Iterable[PullRequest]) -> Iterable[PullRequest]:
     # PRs in B take precedence over ones in A, as they follow in the chain
     pr_map = {pr.number: pr for pr in chain(a, b)}
     return pr_map.values()
