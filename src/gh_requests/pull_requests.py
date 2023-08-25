@@ -65,7 +65,7 @@ def _fetch_updated_pr(gh: Github, check_github_actions: bool, pr: PullRequest) -
 
 
 def _add_pr_details(pr: PullRequest, check_github_actions: bool) -> PullRequestWithDetails:
-    pr_with_details = PullRequestWithDetails(
+    return PullRequestWithDetails(
         pr=pr,
         title=pr.title,
         user=pr.user.login,
@@ -75,11 +75,9 @@ def _add_pr_details(pr: PullRequest, check_github_actions: bool) -> PullRequestW
         needs_rebase=not pr.mergeable,
         is_approved=_is_approved(pr),
         github_action_checked=check_github_actions,
+        check_github_actions=_is_ready_to_merge(pr) if check_github_actions else False,
         is_merged=pr.merged,
     )
-    if check_github_actions:
-        pr_with_details.is_ready_to_merge = _is_ready_to_merge(pr)
-    return pr_with_details
 
 
 def _combine_prs_with_precedence(a: Iterable[PullRequest], b: Iterable[PullRequest]) -> Iterable[PullRequest]:
