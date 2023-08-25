@@ -10,8 +10,6 @@ from github.PullRequest import PullRequest
 
 from gh_requests.models import PullRequestQuery, PullRequestWithDetails
 
-DEFAULT_EXECUTOR = ThreadPoolExecutor(max_workers=4)
-
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullRequestWithDetails]:
@@ -44,30 +42,12 @@ def fetch_updated_pull_requests(
 def _fetch_prs_concurrently(
     issues: list[Issue],
     check_github_actions: bool,
-    *,
-    executor: ThreadPoolExecutor = DEFAULT_EXECUTOR,
 ) -> list[PullRequestWithDetails]:
     prs_with_details = []
 
-    def add_details(issue: Issue):
-        pr = issue.as_pull_request()
-        pr_with_details = PullRequestWithDetails(
-            pr=pr,
-            title=pr.title,
-            user=pr.user.login,
-            name=pr.base.repo.full_name,
-            number=pr.number,
-            html_url=pr.html_url,
-            needs_rebase=not pr.mergeable,
-            is_approved=_is_approved(pr),
-            github_action_checked=check_github_actions,
-        )
-        if check_github_actions:
-            pr_with_details.is_ready_to_merge = _is_ready_to_merge(pr)
-        return pr_with_details
-
-    with executor as task_pool:
-        futures = [task_pool.submit(add_details, issue) for issue in issues]
+    with ThreadPoolExecutor(max_workers=4) as task_pool:
+        add_pr_details_partial = partial(_add_pr_details, check_github_actions=check_github_actions)
+        futures = [task_pool.submit(add_pr_details_partial, issue) for issue in issues]
         for future in futures:
             pr_with_details = future.result()
             prs_with_details.append(pr_with_details)
@@ -79,36 +59,46 @@ def _fetch_updated_prs_concurrently(
     gh: Github,
     prs: list[PullRequest],
     check_github_actions: bool = False,
-    *,
-    executor: ThreadPoolExecutor = DEFAULT_EXECUTOR,
 ) -> list[PullRequestWithDetails]:
     prs_with_details = []
 
-    def add_details(issue: Issue):
-        pr = issue.as_pull_request()
-        pr_with_details = PullRequestWithDetails(
-            pr=_fetch_updated_pr(gh, issue),
-            title=pr.title,
-            user=pr.user.login,
-            name=pr.base.repo.full_name,
-            number=pr.number,
-            html_url=pr.html_url,
-            needs_rebase=not pr.mergeable,
-            is_approved=_is_approved(pr),
-            github_action_checked=check_github_actions,
-            is_merged=pr.merged,
+    with ThreadPoolExecutor(max_workers=4) as task_pool:
+        add_pr_details_partial = partial(
+            _add_pr_details, check_github_actions=check_github_actions, refetch=True, gh=gh
         )
-        if check_github_actions:
-            pr_with_details.is_ready_to_merge = _is_ready_to_merge(pr)
-        return pr_with_details
-
-    with executor as task_pool:
-        futures = [task_pool.submit(add_details, pr) for pr in prs]
+        futures = [task_pool.submit(add_pr_details_partial, pr) for pr in prs]
         for future in futures:
             pr_with_details = future.result()
             prs_with_details.append(pr_with_details)
 
     return prs_with_details
+
+
+def _add_pr_details(
+    issue: Issue | PullRequest,
+    check_github_actions: bool,
+    refetch: bool = False,
+    gh: Github | None = None,
+) -> PullRequestWithDetails:
+    if refetch:
+        pr = _fetch_updated_pr(gh, issue)
+    else:
+        pr = issue.as_pull_request()
+    pr_with_details = PullRequestWithDetails(
+        pr=pr,
+        title=pr.title,
+        user=pr.user.login,
+        name=pr.base.repo.full_name,
+        number=pr.number,
+        html_url=pr.html_url,
+        needs_rebase=not pr.mergeable,
+        is_approved=_is_approved(pr),
+        github_action_checked=check_github_actions,
+        is_merged=pr.merged,
+    )
+    if check_github_actions:
+        pr_with_details.is_ready_to_merge = _is_ready_to_merge(pr)
+    return pr_with_details
 
 
 def _fetch_updated_pr(gh: Github, pr: PullRequest) -> PullRequest:
