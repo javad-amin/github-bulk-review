@@ -44,7 +44,7 @@ def _pull_request_form() -> PullRequestReview:
             if pr_with_details.is_merged:
                 review_status += f"{' | Ⓜ️ Merged'}"
                 st.write(
-                    f"{repo_name_link} | {pr_with_details.title} by {pr_with_details.user.login}{mergability}{needs_rebase}{review_status}"
+                    f"{repo_name_link} | {pr_with_details.title} by {pr_with_details.user}{mergability}{needs_rebase}{review_status}"
                 )
                 continue
             checked = st.checkbox(
