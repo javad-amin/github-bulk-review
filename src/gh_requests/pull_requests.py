@@ -11,6 +11,10 @@ from github.PullRequest import PullRequest
 from gh_requests.models import PullRequestQuery, PullRequestWithDetails
 
 
+def get_default_executor() -> ThreadPoolExecutor:
+    return ThreadPoolExecutor(max_workers=4)
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullRequestWithDetails]:
     gh = Github(st.session_state.token)
@@ -43,7 +47,7 @@ def _fetch_prs_concurrently(
     issues: list[Issue],
     check_github_actions: bool,
 ) -> Iterator[PullRequestWithDetails]:
-    with ThreadPoolExecutor(max_workers=4) as task_pool:
+    with get_default_executor() as task_pool:
         return task_pool.map(partial(_fetch_pr, check_github_actions), issues)
 
 
@@ -56,7 +60,7 @@ def _fetch_updated_prs_concurrently(
     prs: list[PullRequest],
     check_github_actions: bool = False,
 ) -> Iterator[PullRequestWithDetails]:
-    with ThreadPoolExecutor(max_workers=4) as task_pool:
+    with get_default_executor as task_pool:
         return task_pool.map(partial(_fetch_updated_pr, gh, check_github_actions), prs)
 
 
