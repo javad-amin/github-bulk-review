@@ -60,7 +60,7 @@ def _fetch_updated_prs_concurrently(
     prs: list[PullRequest],
     check_github_actions: bool = False,
 ) -> Iterator[PullRequestWithDetails]:
-    with get_default_executor as task_pool:
+    with get_default_executor() as task_pool:
         return task_pool.map(partial(_fetch_updated_pr, gh, check_github_actions), prs)
 
 
