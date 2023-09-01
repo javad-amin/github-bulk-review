@@ -15,7 +15,6 @@ def get_default_executor() -> ThreadPoolExecutor:
     return ThreadPoolExecutor(max_workers=4)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
 def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullRequestWithDetails]:
     gh = Github(st.session_state.token)
 
