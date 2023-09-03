@@ -19,6 +19,9 @@ def main() -> None:
     if "prs_to_refetch" not in st.session_state:
         st.session_state.prs_to_refetch = []
 
+    if "retained_messaged" not in st.session_state:
+        st.session_state.retained_messaged = []
+
     if token := github_token_form():
         if "token" not in st.session_state:
             st.session_state.token = token
