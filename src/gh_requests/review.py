@@ -33,7 +33,7 @@ def process_pull_request_review(
 
     if selected:
         if action == PullRequestAction.COMMENT:
-            # pr.create_issue_comment(comment)
+            pr.create_issue_comment(comment)
             return pr, f"Comment added to {pr}"
 
         if action in [PullRequestAction.APPROVE, PullRequestAction.APPROVE_AND_MERGE]:
@@ -53,6 +53,6 @@ def process_pull_request_review(
                 # Recheck as the user might have not checked the github actions checkbox
                 if not is_ready_to_merge(pr):
                     return None, f"{pr} was not merged as it is not ready to merge, could be due to github actions!"
-            # pr.merge()
+            pr.merge()
             return pr, f"{pr} was merged"
     return None, ""
