@@ -6,6 +6,7 @@ from github.PullRequest import PullRequest
 from gh_requests.config import GithubConfig
 from gh_requests.models import PullRequestAction, PullRequestReview
 from gh_requests.pull_requests import fetch_pull_requests, fetch_updated_pull_requests
+from gh_requests.review import process_pull_request_review_concurrently
 from views.sidebar.search import pull_request_query_form
 
 
@@ -39,7 +40,7 @@ def _pull_request_form() -> PullRequestReview:
                 mergability = f"{' | 🟢 Mergable' if pr_with_details.is_ready_to_merge else ' | 🔴 Not Mergable'}"
             else:
                 mergability = ""
-            needs_rebase = f"{' | ⚠️ Rebase required' if not pr_with_details.needs_rebase else ''}"
+            needs_rebase = f"{' | ⚠️ Rebase required' if pr_with_details.needs_rebase else ''}"
             review_status = f"{' | ✅ Approved' if pr_with_details.is_approved else ' | ❌ Not Approved'}"
             if pr_with_details.is_merged:
                 review_status += f"{' | Ⓜ️ Merged'}"
@@ -52,7 +53,7 @@ def _pull_request_form() -> PullRequestReview:
                 value=select_all,
             )
 
-            selection_result[pr_with_details.pr] = checked
+            selection_result[pr_with_details] = checked
 
         comment_text = st.text_input(
             label="Comment:",
@@ -72,7 +73,6 @@ def _pull_request_form() -> PullRequestReview:
     )
 
 
-# TODO: Move API calls to gh_requests/pull_requests.py
 def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
     pull_requests = st.session_state.pull_requests
     if pull_request_review.action == PullRequestAction.NONE:
@@ -82,32 +82,17 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
         st.warning("No pull request selected!")
         return None
 
-    number_of_prs_selected = 0
     st.session_state.prs_to_refetch = []
 
-    for pr, selected in pull_request_review.selection_result.items():
-        if selected:
-            number_of_prs_selected += 1
-
-            if pull_request_review.action == PullRequestAction.COMMENT:
-                pr.create_issue_comment(pull_request_review.comment)
-                st.write(f"Comment added to {pr}")
-
-            if pull_request_review.action in [PullRequestAction.APPROVE, PullRequestAction.APPROVE_AND_MERGE]:
-                approval_response = pr.create_review(body=pull_request_review.comment, event="APPROVE")
-                if approval_response.state != "APPROVED":
-                    st.warning(f"Something went wrong while approving {pr}: {approval_response.body}")
-                st.write(f"{pr} was approved")
-
-                time.sleep(1)
-
-            if pull_request_review.action in [PullRequestAction.MERGE, PullRequestAction.APPROVE_AND_MERGE]:
-                pr.merge()
-                st.write(f"{pr} was merged")
-
+    for pr, message in process_pull_request_review_concurrently(pull_request_review):
+        if pr:
             st.session_state.prs_to_refetch.append(pr)
+        if message and pr:
+            st.write(message)
+        if message and not pr:
+            st.warning(message)
 
-    if number_of_prs_selected:
+    if number_of_prs_selected := len(st.session_state.prs_to_refetch):
         st.success(
             f'{number_of_prs_selected} selected pull requests was acted on with comment: "{pull_request_review.comment}"'
         )
@@ -115,10 +100,10 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
             updated_pull_requests = fetch_updated_pull_requests(pull_requests, st.session_state.prs_to_refetch)
             st.session_state.pull_requests = updated_pull_requests
             st.info("Pull requests were refetched.")
-            time.sleep(1)
+            time.sleep(0.5)
             st.experimental_rerun()
     else:
-        st.warning("No pull requests selected.")
+        st.warning("No review was submitted.")
 
 
 def _get_action(comment_only: bool, approved: bool, merge: bool, approve_and_merge: bool) -> PullRequestAction:

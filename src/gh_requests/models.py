@@ -37,6 +37,9 @@ class PullRequestWithDetails:
     is_ready_to_merge: bool = False
     is_merged: bool = False
 
+    def __hash__(self):
+        return hash(self.pr)
+
 
 class PullRequestAction(Enum):
     NONE = "none"
