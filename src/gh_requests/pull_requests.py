@@ -1,21 +1,17 @@
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from itertools import chain
-from typing import Iterable, Iterator
+from typing import Generator, Iterable, Iterator
 
 import streamlit as st
 from github import Github
 from github.Issue import Issue
 from github.PullRequest import PullRequest
 
+from gh_requests.executor import default_executor
 from gh_requests.models import PullRequestQuery, PullRequestWithDetails
 
 
-def get_default_executor() -> ThreadPoolExecutor:
-    return ThreadPoolExecutor(max_workers=4)
-
-
-def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullRequestWithDetails]:
+def fetch_pull_requests(pull_request_query: PullRequestQuery) -> Generator[PullRequestWithDetails, None, None]:
     gh = Github(st.session_state.token)
 
     filter_params = "is:pr is:open archived:false"
@@ -31,7 +27,8 @@ def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullReques
         filter_params += f" in:title {pull_request_query.title}"
 
     issues = list(gh.search_issues(query=filter_params))
-    return list(_fetch_prs_concurrently(issues, pull_request_query.check_github_actions))
+    for pr_with_details in _fetch_prs_concurrently(issues, pull_request_query.check_github_actions):
+        yield pr_with_details
 
 
 def fetch_updated_pull_requests(
@@ -45,9 +42,13 @@ def fetch_updated_pull_requests(
 def _fetch_prs_concurrently(
     issues: list[Issue],
     check_github_actions: bool,
-) -> Iterator[PullRequestWithDetails]:
-    with get_default_executor() as task_pool:
-        return task_pool.map(partial(_fetch_pr, check_github_actions), issues)
+) -> Generator[PullRequestWithDetails, None, None]:
+    with default_executor() as task_pool:
+        for pr_with_details in task_pool.map(
+            partial(_fetch_pr, check_github_actions),
+            issues,
+        ):
+            yield pr_with_details
 
 
 def _fetch_pr(check_github_actions: bool, issue: Issue) -> PullRequestWithDetails:
@@ -59,7 +60,7 @@ def _fetch_updated_prs_concurrently(
     prs: list[PullRequest],
     check_github_actions: bool = False,
 ) -> Iterator[PullRequestWithDetails]:
-    with get_default_executor() as task_pool:
+    with default_executor() as task_pool:
         return task_pool.map(partial(_fetch_updated_pr, gh, check_github_actions), prs)
 
 
@@ -78,7 +79,7 @@ def _add_pr_details(pr: PullRequest, check_github_actions: bool) -> PullRequestW
         needs_rebase=not pr.mergeable,
         is_approved=_is_approved(pr),
         github_action_checked=check_github_actions,
-        is_ready_to_merge=_is_ready_to_merge(pr) if check_github_actions else False,
+        is_ready_to_merge=is_ready_to_merge(pr) if check_github_actions else False,
         is_merged=pr.merged,
     )
 
@@ -100,7 +101,7 @@ def _is_approved(pr: PullRequest) -> bool:
     return approved_reviews > 0
 
 
-def _is_ready_to_merge(pr: PullRequest) -> bool:
+def is_ready_to_merge(pr: PullRequest) -> bool:
     head_commit = pr.head.sha
 
     check_runs = pr.base.repo.get_commit(head_commit).get_check_runs()
