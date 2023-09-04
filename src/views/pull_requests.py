@@ -1,3 +1,5 @@
+import time
+
 import streamlit as st
 from github.PullRequest import PullRequest
 
@@ -103,11 +105,14 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
         st.session_state.retained_messaged.append(RetainedMessage(MessageType.SUCCESS, success_message))
 
         if st.session_state.prs_to_refetch:
-            updated_pull_requests = fetch_updated_pull_requests(pull_requests, st.session_state.prs_to_refetch)
-            st.session_state.pull_requests = updated_pull_requests
-            refetch_message = "Pull requests were re-fetched."
-            st.info(refetch_message)
-            st.session_state.retained_messaged.append(RetainedMessage(MessageType.INFO, refetch_message))
+            with st.spinner("Re-fetching pull requests, please wait..."):
+                time.sleep(5)
+                updated_pull_requests = fetch_updated_pull_requests(pull_requests, st.session_state.prs_to_refetch)
+                st.session_state.pull_requests = updated_pull_requests
+                refetch_message = "Pull requests successfully re-fetched!"
+                st.info(refetch_message)
+                st.session_state.retained_messaged.append(RetainedMessage(MessageType.INFO, refetch_message))
+
             st.experimental_rerun()
     else:
         failure_message = "No review was submitted!"
