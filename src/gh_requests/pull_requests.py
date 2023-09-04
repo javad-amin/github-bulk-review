@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import chain
-from typing import Iterable, Iterator
+from typing import Generator, Iterable, Iterator
 
 import streamlit as st
 from github import Github
@@ -12,7 +12,7 @@ from gh_requests.models import PullRequestQuery, PullRequestWithDetails
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullRequestWithDetails]:
+def fetch_pull_requests(pull_request_query: PullRequestQuery) -> Generator[PullRequestWithDetails, None, None]:
     gh = Github(st.session_state.token)
 
     filter_params = "is:pr is:open archived:false"
@@ -28,7 +28,8 @@ def fetch_pull_requests(pull_request_query: PullRequestQuery) -> list[PullReques
         filter_params += f" in:title {pull_request_query.title}"
 
     issues = list(gh.search_issues(query=filter_params))
-    return list(_fetch_prs_concurrently(issues, pull_request_query.check_github_actions))
+    for pr_with_details in _fetch_prs_concurrently(issues, pull_request_query.check_github_actions):
+        yield pr_with_details
 
 
 def fetch_updated_pull_requests(
@@ -42,9 +43,13 @@ def fetch_updated_pull_requests(
 def _fetch_prs_concurrently(
     issues: list[Issue],
     check_github_actions: bool,
-) -> Iterator[PullRequestWithDetails]:
+) -> Generator[PullRequestWithDetails, None, None]:
     with default_executor() as task_pool:
-        return task_pool.map(partial(_fetch_pr, check_github_actions), issues)
+        for pr_with_details in task_pool.map(
+            partial(_fetch_pr, check_github_actions),
+            issues,
+        ):
+            yield pr_with_details
 
 
 def _fetch_pr(check_github_actions: bool, issue: Issue) -> PullRequestWithDetails:
