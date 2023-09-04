@@ -28,7 +28,7 @@ def process_pull_request_review(
     pull_request_to_review: tuple[PullRequestWithDetails, bool],
     action: PullRequestAction,
     comment: str,
-) -> tuple[PullRequest, str]:
+) -> tuple[PullRequest | None, str]:
     pr_with_details, selected = pull_request_to_review
     pr: PullRequest = pr_with_details.pr
 
