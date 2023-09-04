@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Generator
 
+from github import GithubException
 from github.PullRequest import PullRequest
 
 from gh_requests.executor import default_executor
@@ -53,6 +54,14 @@ def process_pull_request_review(
                 # Recheck as the user might have not checked the github actions checkbox
                 if not is_ready_to_merge(pr):
                     return None, f"{pr} was not merged as it is not ready to merge, could be due to github actions!"
-            pr.merge()
-            return pr, f"{pr} was merged"
+            try:
+                merge_response = pr.merge()
+                if merge_response.merged:
+                    return pr, f"{pr} was merged!"
+                else:
+                    return None, f"{pr} was not merged!"
+
+            except GithubException as e:
+                return None, f"{pr} was not merged! Error: {e}"
+
     return None, ""
