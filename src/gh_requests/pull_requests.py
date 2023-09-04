@@ -11,7 +11,6 @@ from gh_requests.executor import default_executor
 from gh_requests.models import PullRequestQuery, PullRequestWithDetails
 
 
-@st.cache_data(ttl=300, show_spinner=False)
 def fetch_pull_requests(pull_request_query: PullRequestQuery) -> Generator[PullRequestWithDetails, None, None]:
     gh = Github(st.session_state.token)
 
