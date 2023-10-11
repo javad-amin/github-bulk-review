@@ -1,6 +1,6 @@
 import streamlit as st
 
-from config import GithubConfig
+from gh_requests.config import GithubConfig
 from views.pull_requests import pr_fetch_view
 from views.sidebar.token import github_token_form
 
@@ -18,6 +18,9 @@ def main() -> None:
 
     if "prs_to_refetch" not in st.session_state:
         st.session_state.prs_to_refetch = []
+
+    if "retained_messaged" not in st.session_state:
+        st.session_state.retained_messaged = []
 
     if token := github_token_form():
         if "token" not in st.session_state:

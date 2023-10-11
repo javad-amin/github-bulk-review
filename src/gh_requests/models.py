@@ -4,7 +4,7 @@ from typing import Self
 
 from github.PullRequest import PullRequest
 
-from config import GithubConfig
+from gh_requests.config import GithubConfig
 
 
 @dataclass
@@ -21,6 +21,24 @@ class PullRequestQuery:
         for field_name, field_value in self.__dict__.items():
             if field_name != "self" and field_value is not None:
                 GithubConfig().update(field_name, str(field_value))
+
+
+@dataclass
+class PullRequestWithDetails:
+    pr: PullRequest
+    title: str
+    user: str
+    name: str
+    number: int
+    html_url: str
+    needs_rebase: bool
+    is_approved: bool
+    github_action_checked: bool = False
+    is_ready_to_merge: bool = False
+    is_merged: bool = False
+
+    def __hash__(self):
+        return hash(self.pr)
 
 
 class PullRequestAction(Enum):
