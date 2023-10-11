@@ -1,7 +1,7 @@
 import streamlit as st
 
-from config import GithubConfig
-from pull_requests import PullRequestQuery
+from gh_requests.config import GithubConfig
+from gh_requests.models import PullRequestQuery
 
 
 def pull_request_query_form() -> PullRequestQuery:
