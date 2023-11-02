@@ -6,7 +6,7 @@ from github.PullRequest import PullRequest
 from gh_requests.config import GithubConfig
 from gh_requests.models import PullRequestAction, PullRequestQuery, PullRequestReview, PullRequestWithDetails
 from gh_requests.pull_requests import fetch_pull_requests, fetch_updated_pull_requests
-from gh_requests.review import process_pull_request_review_concurrently
+from gh_requests.review import process_pull_request_review_concurrently_with_pause
 from views.messages import MessageType, RetainedMessage, write_retained_messages
 from views.sidebar.search import pull_request_query_form
 
@@ -103,7 +103,7 @@ def _process_pull_requests(pull_request_review: PullRequestReview) -> None:
     st.session_state.prs_to_refetch = []
 
     st.session_state.retained_messaged = []
-    for pr, message in process_pull_request_review_concurrently(pull_request_review):
+    for pr, message in process_pull_request_review_concurrently_with_pause(pull_request_review):
         if pr:
             st.session_state.prs_to_refetch.append(pr)
         if message and pr:

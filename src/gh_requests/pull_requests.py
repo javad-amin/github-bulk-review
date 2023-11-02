@@ -28,6 +28,12 @@ def fetch_pull_requests(pull_request_query: PullRequestQuery) -> Generator[PullR
 
     issues = list(gh.search_issues(query=filter_params))
     for pr_with_details in _fetch_prs_concurrently(issues, pull_request_query.check_github_actions):
+        # TODO avoid hitting primary rate limit
+        rate_limit = gh.get_rate_limit()
+        print("Rate Limit Limit:", rate_limit.core.limit)
+        print("Rate Limit Remaining:", rate_limit.core.remaining)
+        print("Rate Limit Reset Timestamp:", rate_limit.core.reset)
+
         yield pr_with_details
 
 
